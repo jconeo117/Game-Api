@@ -40,7 +40,15 @@ namespace DungeonCrawlerAPI.Models
         /// <summary>
         /// Dungeon Runs
         /// </summary>
+        
         public ICollection<MDungeonRun> DungeonRuns { get; set; } = new List<MDungeonRun>();
+
+        /// <summary>
+        /// Items Solds
+        /// </summary>
+        
+        public ICollection<ItemShop> ItemShop { get; set; } = new List<ItemShop>();
+
 
     }
 }

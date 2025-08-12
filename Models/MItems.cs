@@ -41,6 +41,8 @@ namespace DungeonCrawlerAPI.Models
 
         [ForeignKey(nameof(InventaryId))]
         public MInventory Inventory { get; set; }
+
+        public ICollection<ItemShop> ShoppingListing { get; set; } = new List<ItemShop>();
     }
 
     [Table("Items_Shop")]
