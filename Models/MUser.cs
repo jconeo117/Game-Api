@@ -29,6 +29,12 @@ namespace DungeonCrawlerAPI.Models
         [Column("Is_Active")]
         public bool IsActive { get; set; } = false;
 
+        [Column("Refresh_Token")]
+        public string? RefreshToken { get; set; }
+
+        [Column("Expires_In")]
+        public DateTime? TokenExpiresTimen { get; set; }
+
         [Column("Character")]
         public MCharacter Character { get; set; }
     }
