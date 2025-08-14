@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DungeonCrawlerAPI.Interfaces
 {
 
-    public interface IAuthorization : IRepository<MUser>
+    public interface IAuthRepository : IRepository<MUser>
     {
         Task<MUser?> GetByEmailAsync(string email);
         Task<MUser?> GetByUsernameAsync(string username);
@@ -12,9 +12,9 @@ namespace DungeonCrawlerAPI.Interfaces
     }
 
 
-    public class Authorization : Repository<MUser>, IAuthorization
+    public class AuthRepository : Repository<MUser>, IAuthRepository
     {
-        public Authorization(AppDBContext context) : base(context)
+        public AuthRepository(AppDBContext context) : base(context)
         {
         }
 
