@@ -6,8 +6,8 @@ namespace DungeonCrawlerAPI.Services
 
     public interface IAuthService
     {
-        Task<ServiceResult<UserDTO>> RegisterAsync(RegisterDTO user);
-        Task<ServiceResult<TokenDTO>> LoginAsync(LoginDTO user);
+        Task<ServiceResult<AuthResponseDTO>> RegisterAsync(RegisterDTO user);
+        Task<ServiceResult<AuthResponseDTO>> LoginAsync(LoginDTO user);
         Task<ServiceResult<UserDTO>> UpdateProfileAsync(string id, UserDTO user);
         Task<ServiceResult<bool>> DeleteProfileAsync(string id);
 
@@ -36,12 +36,12 @@ namespace DungeonCrawlerAPI.Services
             throw new NotImplementedException();
         }
 
-        public Task<ServiceResult<TokenDTO>> LoginAsync(LoginDTO user)
+        public Task<ServiceResult<AuthResponseDTO>> LoginAsync(LoginDTO user)
         {
             throw new NotImplementedException();
         }
 
-        public Task<ServiceResult<UserDTO>> RegisterAsync(RegisterDTO user)
+        public Task<ServiceResult<AuthResponseDTO>> RegisterAsync(RegisterDTO user)
         {
             throw new NotImplementedException();
         }
