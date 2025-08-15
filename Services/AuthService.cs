@@ -15,8 +15,8 @@ namespace DungeonCrawlerAPI.Services
         Task<ServiceResult<bool>> ChangePasswordAsync(string id, ChangePasswordDTO changePasswordDTO);
         Task<ServiceResult<UserDTO>> GetProfileAsync(string id);
 
-        Task<ServiceResult<bool>> ValidateUsernameExistsAsync(string username);
-        Task<ServiceResult<bool>> ValidateEmailExistsAsync(string Email);
+        Task<ServiceResult<bool>> ValidateUsernameExistsAsync(string username, string excludeUserId);
+        Task<ServiceResult<bool>> ValidateEmailExistsAsync(string Email, string excludeUserId);
     }
 
 
@@ -34,9 +34,32 @@ namespace DungeonCrawlerAPI.Services
             _passwordService = passwordService;
         }
 
-        public Task<ServiceResult<bool>> ChangePasswordAsync(string id, ChangePasswordDTO changePasswordDTO)
+        public async Task<ServiceResult<bool>> ChangePasswordAsync(string id, ChangePasswordDTO changePasswordDTO)
         {
-            throw new NotImplementedException();
+
+            var user = await _authRepository.GetByIdAsync(id);
+
+            if(user == null)
+            {
+                return ServiceResult<bool>.NotFound("Usuario no encontrado");
+            }
+
+            if(!_passwordService.ValidatePassword(changePasswordDTO.CurrentPassword, user.Password))
+            {
+                return ServiceResult<bool>.Error("La contraseña actual no es correcta");
+            }
+
+            if(changePasswordDTO.NewPassword != changePasswordDTO.ConfirmNewPassword)
+            {
+                return ServiceResult<bool>.Error("Las contraseñas no coinciden");
+            }
+
+            var newPassword = _passwordService.HashPassword(changePasswordDTO.ConfirmNewPassword);
+
+            user.Password = newPassword;
+            await _authRepository.UpdateAsync(user);
+
+            return ServiceResult<bool>.Success(true);
         }
 
         public Task<ServiceResult<bool>> DeleteProfileAsync(string id)
@@ -44,9 +67,24 @@ namespace DungeonCrawlerAPI.Services
             throw new NotImplementedException();
         }
 
-        public Task<ServiceResult<UserDTO>> GetProfileAsync(string id)
+        public async Task<ServiceResult<UserDTO>> GetProfileAsync(string id)
         {
-            throw new NotImplementedException();
+            var profile = await _authRepository.GetByIdAsync(id);
+
+            if(profile == null)
+            {
+                return ServiceResult<UserDTO>.NotFound("El usuario no fue encontrado");
+            }
+
+            var Response = new UserDTO
+            {
+                Email = profile.Email,
+                Username = profile.Username,
+                Id = profile.Id,
+                CreatedAt = profile.CreatedAt
+            };
+
+            return ServiceResult<UserDTO>.Success(Response);
         }
 
         public async Task<ServiceResult<AuthResponseDTO>> LoginAsync(LoginDTO user)
@@ -152,19 +190,91 @@ namespace DungeonCrawlerAPI.Services
             return ServiceResult<AuthResponseDTO>.Success(response);
         }
 
-        public Task<ServiceResult<UserDTO>> UpdateProfileAsync(string id, UserDTO user)
+        public async Task<ServiceResult<UserDTO>> UpdateProfileAsync(string id, UserDTO user)
         {
-            throw new NotImplementedException();
+            var userDB = await _authRepository.GetByIdAsync(id);
+
+            if(userDB == null)
+            {
+                return ServiceResult<UserDTO>.NotFound("El usuario no fue encontrado");
+            }
+
+            //if(userDB.Email == user.Email || userDB.Username == user.Username)
+            //{
+            //    return ServiceResult<UserDTO>.Error("Estas usando el mismo Email y/o Username que tienes actualmente");
+            //}
+
+            bool emailChanged = userDB.Email != user.Email;
+            bool usernameChanged = userDB.Username != user.Username;
+
+            // 3. Si no hay cambios, retornar el usuario actual
+            if (!emailChanged && !usernameChanged)
+            {
+                return ServiceResult<UserDTO>.Success(user);
+            }
+
+            var validationTasks = new List<Task<ServiceResult<bool>>>();
+
+            if (emailChanged)
+                validationTasks.Add(ValidateEmailExistsAsync(user.Email, id));
+
+            if (usernameChanged)
+                validationTasks.Add(ValidateUsernameExistsAsync(user.Username, id));
+
+            var validationResults = await Task.WhenAll(validationTasks);
+
+            // 5. Verificar si alguna validación falló
+            var failedValidation = validationResults.FirstOrDefault(r => !r.IsSuccess);
+            if (failedValidation != null)
+            {
+                return ServiceResult<UserDTO>.Error(failedValidation.ErrorMessage);
+            }
+
+            if (emailChanged)
+                userDB.Email = user.Email;
+
+            if (usernameChanged)
+                userDB.Username = user.Username;
+
+            userDB.UpdatedAt = DateTime.UtcNow;
+
+            await _authRepository.UpdateAsync(userDB);
+
+            var response = new UserDTO
+            {
+                Id = userDB.Id,
+                Email = userDB.Email,
+                Username = userDB.Username,
+                CreatedAt = userDB.CreatedAt,
+            };
+
+            return ServiceResult<UserDTO>.Success(response);
         }
 
-        public Task<ServiceResult<bool>> ValidateEmailExistsAsync(string Email)
+        public async Task<ServiceResult<bool>> ValidateEmailExistsAsync(string Email, string excludeUserId)
         {
-            throw new NotImplementedException();
+            var existingUser = await _authRepository.GetByEmailAsync(Email);
+
+            // Si existe un usuario con ese email Y no es el usuario actual, entonces está en uso
+            if (existingUser != null && existingUser.Id != excludeUserId)
+            {
+                return ServiceResult<bool>.Error("Este email ya está en uso");
+            }
+
+            return ServiceResult<bool>.Success(true); // Email disponible
         }
 
-        public Task<ServiceResult<bool>> ValidateUsernameExistsAsync(string username)
+        public async Task<ServiceResult<bool>> ValidateUsernameExistsAsync(string username, string excludeUserId)
         {
-            throw new NotImplementedException();
+            var existingUser = await _authRepository.GetByUsernameAsync(username);
+
+            // Si existe un usuario con ese email Y no es el usuario actual, entonces está en uso
+            if (existingUser != null && existingUser.Id != excludeUserId)
+            {
+                return ServiceResult<bool>.Error("Este username ya está en uso");
+            }
+
+            return ServiceResult<bool>.Success(true); // Email disponible
         }
     }
 }
