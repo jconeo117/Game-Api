@@ -10,7 +10,7 @@ namespace DungeonCrawlerAPI.Models
         public string Id { get; set; } = Guid.NewGuid().ToString();
 
         [Column("Created_At")]
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         
         [Column("Updated_At")]
         

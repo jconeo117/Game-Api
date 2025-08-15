@@ -16,6 +16,13 @@
         public bool RemenberMe { get; set; }
     }
 
+    public class ForgetPasswordDTO
+    {
+        public string Email { get; set; }
+        public string Password { get; set; }
+        public string ConfirmPassword { get; set; }
+    }
+
     public class ChangePasswordDTO
     {
         public string CurrentPassword { get; set; }
