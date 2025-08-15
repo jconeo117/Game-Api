@@ -76,6 +76,7 @@ namespace DungeonCrawlerAPI.Services
             
             existUser.RefreshToken = refreshToken;
             existUser.TokenExpiresTimen = DateTime.UtcNow.AddDays(7);
+            existUser.LastLogin = DateTime.UtcNow;
 
             await _authRepository.UpdateAsync(existUser);
 
@@ -114,7 +115,8 @@ namespace DungeonCrawlerAPI.Services
             {
                 Email = user.Email,
                 Username = user.UserName,
-                Password = _passwordService.HashPassword(user.Password)
+                Password = _passwordService.HashPassword(user.Password),
+                CreatedBy = user.Email
             };
 
             var createdUser = await _authRepository.CreateAsync(newUser);
