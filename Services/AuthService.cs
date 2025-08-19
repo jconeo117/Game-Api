@@ -62,9 +62,17 @@ namespace DungeonCrawlerAPI.Services
             return ServiceResult<bool>.Success(true);
         }
 
-        public Task<ServiceResult<bool>> DeleteProfileAsync(string id)
+        public async Task<ServiceResult<bool>> DeleteProfileAsync(string id)
         {
-            throw new NotImplementedException();
+            var user = await _authRepository.GetByIdAsync(id);
+            if(user == null)
+            {
+                return ServiceResult<bool>.Error("El usuario no fue encontrado");
+            }
+
+            await _authRepository.DeleteAsync(id);
+
+            return ServiceResult<bool>.Success(true);
         }
 
         public async Task<ServiceResult<UserDTO>> GetProfileAsync(string id)
@@ -198,11 +206,6 @@ namespace DungeonCrawlerAPI.Services
             {
                 return ServiceResult<UserDTO>.NotFound("El usuario no fue encontrado");
             }
-
-            //if(userDB.Email == user.Email || userDB.Username == user.Username)
-            //{
-            //    return ServiceResult<UserDTO>.Error("Estas usando el mismo Email y/o Username que tienes actualmente");
-            //}
 
             bool emailChanged = userDB.Email != user.Email;
             bool usernameChanged = userDB.Username != user.Username;

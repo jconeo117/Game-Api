@@ -37,7 +37,7 @@ namespace DungeonCrawlerAPI.Controllers
             return Ok(result.Data);
         }
 
-        [HttpPost("update-profile")]
+        [HttpPut("update-profile")]
         public async Task <IActionResult> UpdateProfile([FromBody] UserDTO userDTO)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
@@ -72,6 +72,26 @@ namespace DungeonCrawlerAPI.Controllers
             if (!result.IsSuccess)
             {
                 return NotFound(new {message = result.ErrorMessage});
+            }
+
+            return Ok(result.Data);
+        }
+
+        [HttpDelete("delete-profile")]
+        public async Task<IActionResult> DeleteMyProfile()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+
+            if (userId == null)
+            {
+                return Unauthorized();
+            }
+
+            var result = await _authService.DeleteProfileAsync(userId);
+
+            if (!result.IsSuccess)
+            {
+                return NotFound(new { message = result.ErrorMessage });
             }
 
             return Ok(result.Data);
