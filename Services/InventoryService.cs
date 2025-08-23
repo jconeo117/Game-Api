@@ -42,9 +42,31 @@ namespace DungeonCrawlerAPI.Services
             return ServiceResult<MInventory>.Success(CreatedInventory);
         }
 
-        public Task<ServiceResult<InventoryDTO>> GetInventoryById(string CharId)
+        public async Task<ServiceResult<InventoryDTO>> GetInventoryById(string CharId)
         {
-            throw new NotImplementedException();
+            var inventory =  await _inventoryRepository.GetInventoryByCharId(CharId);
+
+            if(inventory == null)
+            {
+                return ServiceResult<InventoryDTO>.Error("El character no tiene inventario o no existe");
+            }
+
+            var response = new InventoryDTO
+            {
+                Id = inventory.Id,
+                NumSlots = inventory.NumSlots,
+                Items = inventory.Items.Select(item => new ItemDTO
+                {
+                    Id = item.Id,
+                    Name = item.Name,
+                    Description = item.Description,
+                    ItemType = item.ItemType.ToString(),
+                    value = item.Value,
+                    stats = item.Stats.GetActiveStats()
+                }).ToList()
+            };
+
+            return ServiceResult<InventoryDTO>.Success(response);
         }
 
         private List<MItems> CreateInitialInventory(string InventoryId)
