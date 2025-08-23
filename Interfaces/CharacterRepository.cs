@@ -6,8 +6,8 @@ namespace DungeonCrawlerAPI.Interfaces
 
     public interface ICharacterRepository : IRepository<MCharacter>
     {
-        Task<MCharacter?> GetCharByIdAsync(string UserId);
-        Task<MCharacter?> GetByNameAsync(string Name);
+        Task<MCharacter?> GetCharByUserIdAsync(string UserId);
+        Task<MCharacter?> GetByNameAsync(string Name, string UserId);
     }
 
     public class CharacterRepository : Repository<MCharacter>, ICharacterRepository
@@ -16,14 +16,14 @@ namespace DungeonCrawlerAPI.Interfaces
         {
         }
 
-        public async Task<MCharacter?> GetByNameAsync(string Name)
+        public async Task<MCharacter?> GetByNameAsync(string Name, string UserId)
         {
-            return await _dbset.FirstOrDefaultAsync(c => c.Name == Name);
+            return await _dbset.FirstOrDefaultAsync(c => c.Name == Name && c.UserId == UserId);
         }
 
-        public async Task<MCharacter?> GetCharByIdAsync(string CharId)
+        public async Task<MCharacter?> GetCharByUserIdAsync(string UserId)
         {
-            return await _dbset.FirstOrDefaultAsync(c => c.Id == CharId);
+            return await _dbset.FirstOrDefaultAsync(c => c.UserId == UserId);
         }
     }
 }
