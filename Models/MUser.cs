@@ -35,7 +35,16 @@ namespace DungeonCrawlerAPI.Models
         [Column("Expires_In")]
         public DateTime? TokenExpiresTimen { get; set; }
 
+        [Column("Role")]
+        public Role Role { get; set; } = Role.User;
+
         [Column("Character")]
         public MCharacter Character { get; set; }
+    }
+
+    public enum Role
+    {
+        User,
+        Admin
     }
 }
