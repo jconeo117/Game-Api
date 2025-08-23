@@ -18,6 +18,5 @@ namespace DungeonCrawlerAPI.DTO_s
         public int Level { get; set; }
         public int Experience { get; set; }
         public int Gold { get; set; }
-        public string Owner { get; set; }
     }
 }
