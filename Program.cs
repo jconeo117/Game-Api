@@ -18,6 +18,12 @@ builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<ICharacterRepository, CharacterRepository>();
+builder.Services.AddScoped<ICharacterService, CharacterService>();
+builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IItemsRepository, ItemsRepository>();
+
 
 
 builder.Services.AddDbContext<AppDBContext>(op =>
