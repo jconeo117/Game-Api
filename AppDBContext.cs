@@ -15,6 +15,7 @@ namespace DungeonCrawlerAPI
         public DbSet<ItemShop> ItemsShop { get; set; }
         public DbSet<MDungeon> Dungeons { get; set; }
         public DbSet<MDungeonRun> DungeonRuns { get; set; }
+        public DbSet<MEquipmentSlot> EquipmentSlots { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -73,6 +74,20 @@ namespace DungeonCrawlerAPI
                 .WithMany(c => c.DungeonRuns)
                 .HasForeignKey (dr => dr.CharacterId)
                 .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<MEquipmentSlot>(Entity =>
+            {
+                Entity.HasOne(es => es.Character)
+                .WithMany(c => c.EquipmentSlots)
+                .HasForeignKey(es => es.CharacterId);
+
+                Entity.HasOne(es => es.Item)
+                .WithMany()
+                .HasForeignKey(es => es.ItemId)
+                .IsRequired(false);
+
+                Entity.HasIndex(es => new { es.CharacterId, es.SlotType }).IsUnique();
             });
 
             base.OnModelCreating(modelBuilder);
