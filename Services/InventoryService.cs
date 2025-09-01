@@ -9,18 +9,22 @@ namespace DungeonCrawlerAPI.Services
     {
         Task<ServiceResult<MInventory>> CreateNewInventoryAsync(string CharId);
         Task<ServiceResult<InventoryDTO>> GetInventoryById(string CharId);
+        Task<ServiceResult<bool>> EquipItem(string UserId, string ItemId);
+        Task<ServiceResult<bool>> UnEquipItem(string UserId, string Slot);
+
         
     }
     public class InventoryService : IInventoryService
     {
-
+        private readonly ICharacterRepository _characterRepository;
         private readonly IInventoryRepository _inventoryRepository;
         private readonly IItemsRepository _itemsRepository;
 
-        public InventoryService(IInventoryRepository inventoryRepository, IItemsRepository itemsRepository)
+        public InventoryService(IInventoryRepository inventoryRepository, IItemsRepository itemsRepository, ICharacterRepository characterRepository)
         {
             _inventoryRepository = inventoryRepository;
             _itemsRepository = itemsRepository;
+            _characterRepository = characterRepository;
         }
 
         public async Task<ServiceResult<MInventory>> CreateNewInventoryAsync(string CharId)
@@ -40,6 +44,11 @@ namespace DungeonCrawlerAPI.Services
             }
 
             return ServiceResult<MInventory>.Success(CreatedInventory);
+        }
+
+        public Task<ServiceResult<bool>> EquipItem(string UserId, string ItemId)
+        {
+            throw new NotImplementedException();
         }
 
         public async Task<ServiceResult<InventoryDTO>> GetInventoryById(string CharId)
@@ -67,6 +76,11 @@ namespace DungeonCrawlerAPI.Services
             };
 
             return ServiceResult<InventoryDTO>.Success(response);
+        }
+
+        public Task<ServiceResult<bool>> UnEquipItem(string UserId, string Slot)
+        {
+            throw new NotImplementedException();
         }
 
         private List<MItems> CreateInitialInventory(string InventoryId)

@@ -30,7 +30,8 @@ namespace DungeonCrawlerAPI.Services
             {
                 new Claim(JwtRegisteredClaimNames.Sub, User.Id),
                 new Claim(ClaimTypes.Name, User.Username),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.Role, User.Role.ToString())
             };
 
             var secretKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JwtSettings:SecretKey"]));
