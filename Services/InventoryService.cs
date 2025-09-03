@@ -9,7 +9,7 @@ namespace DungeonCrawlerAPI.Services
     {
         Task<ServiceResult<MInventory>> CreateNewInventoryAsync(string CharId);
         Task<ServiceResult<InventoryDTO>> GetInventoryById(string CharId);
-        Task<ServiceResult<bool>> EquipItem(string UserId, string ItemId);
+        Task<ServiceResult<bool>> EquipItem(string characterId, string ItemId, EquipmentSlotType slotType);
         Task<ServiceResult<bool>> UnEquipItem(string UserId, string Slot);
 
         
@@ -19,12 +19,13 @@ namespace DungeonCrawlerAPI.Services
         private readonly ICharacterRepository _characterRepository;
         private readonly IInventoryRepository _inventoryRepository;
         private readonly IItemsRepository _itemsRepository;
-
-        public InventoryService(IInventoryRepository inventoryRepository, IItemsRepository itemsRepository, ICharacterRepository characterRepository)
+        private readonly IEquipmentSlotRepository _equipmentSlotRepository;
+        public InventoryService(IInventoryRepository inventoryRepository, IItemsRepository itemsRepository, ICharacterRepository characterRepository, IEquipmentSlotRepository equipmentSlotRepository)
         {
             _inventoryRepository = inventoryRepository;
             _itemsRepository = itemsRepository;
             _characterRepository = characterRepository;
+            _equipmentSlotRepository = equipmentSlotRepository;
         }
 
         public async Task<ServiceResult<MInventory>> CreateNewInventoryAsync(string CharId)
@@ -43,12 +44,42 @@ namespace DungeonCrawlerAPI.Services
                 await _itemsRepository.CreateAsync(item);
             }
 
+            var equipmentSlots = CreateEquipmentSlot(CharId);
+            foreach (var slot in equipmentSlots)
+            {
+                await _equipmentSlotRepository.CreateAsync(slot);
+            }
+
             return ServiceResult<MInventory>.Success(CreatedInventory);
         }
 
-        public Task<ServiceResult<bool>> EquipItem(string UserId, string ItemId)
+        public async Task<ServiceResult<bool>> EquipItem(string characterId, string itemId, EquipmentSlotType slotType)
         {
-            throw new NotImplementedException();
+           var inventory = await _inventoryRepository.GetInventoryByCharId(characterId);
+           var itemToEquip = inventory?.Items.FirstOrDefault(i => i.Id == itemId);
+
+            if (itemToEquip == null)
+            {
+                return ServiceResult<bool>.NotFound("El Item no existe en el inventario");
+            }
+
+            var Slot = await _equipmentSlotRepository.GetSlotByCharacterAndTypeAsync(characterId, slotType);
+
+            if (!string.IsNullOrEmpty(Slot.ItemId))
+            {
+                // Futuro: Implementar el intercambio de ítems.
+                return ServiceResult<bool>.Error("El slot ya está ocupado.");
+            }
+
+            //itemToEquip.InventaryId = null; // O la forma que uses para desvincularlo
+
+
+            // Actualizar el slot si ya existe pero está vacío
+            Slot.ItemId = itemId;
+            await _equipmentSlotRepository.UpdateAsync(Slot);
+
+            return ServiceResult<bool>.Success(true);
+            
         }
 
         public async Task<ServiceResult<InventoryDTO>> GetInventoryById(string CharId)
@@ -119,6 +150,25 @@ namespace DungeonCrawlerAPI.Services
                 },
 
             };
+        }
+
+        private List<MEquipmentSlot> CreateEquipmentSlot(string CharId)
+        {
+            List<MEquipmentSlot> equipmentSlots = new List<MEquipmentSlot>();
+
+            foreach (EquipmentSlotType slotType in Enum.GetValues(typeof(EquipmentSlotType)))
+            {
+                var newSlot = new MEquipmentSlot
+                {
+                    CharacterId = CharId,
+                    SlotType = slotType,
+                    ItemId = null, // El slot se crea vacío
+                    CreatedBy = "System"
+                };
+                equipmentSlots.Add(newSlot);
+            }
+
+            return equipmentSlots;
         }
     }
 }
