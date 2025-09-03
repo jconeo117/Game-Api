@@ -38,7 +38,7 @@ namespace DungeonCrawlerAPI.Controllers
             return Ok(response.Data);
         }
 
-        [HttpGet("my-character")]
+        [HttpGet("character")]
         public async Task<IActionResult> GetCharacter()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
@@ -57,5 +57,16 @@ namespace DungeonCrawlerAPI.Controllers
             return Ok(response.Data);
         }
 
+        [HttpGet("character-profile")]
+        public async Task<IActionResult> GetCharacterProfile([FromBody] string CharId)
+        {
+            var response = await _characterService.GetCharacterById(CharId);
+            if (!response.IsSuccess)
+            {
+                return NotFound(response.ErrorMessage);
+            }
+
+            return Ok(response.Data);
+        }
     }
 }
