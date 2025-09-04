@@ -62,6 +62,9 @@ namespace DungeonCrawlerAPI.Models
         
         public ICollection<ItemShop> ItemShop { get; set; } = new List<ItemShop>();
 
+        /// <summary>
+        /// Equipment Slots
+        /// </summary>
         public ICollection<MEquipmentSlot> EquipmentSlots { get; set; }
     }
 

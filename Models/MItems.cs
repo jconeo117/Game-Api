@@ -37,7 +37,7 @@ namespace DungeonCrawlerAPI.Models
 
         //Relaciones
         [Column("Inventario")]
-        public string InventaryId { get; set; }
+        public string? InventaryId { get; set; }
 
         [ForeignKey(nameof(InventaryId))]
         public MInventory Inventory { get; set; }
