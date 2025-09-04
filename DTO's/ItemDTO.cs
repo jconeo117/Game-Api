@@ -12,6 +12,12 @@ namespace DungeonCrawlerAPI.DTO_s
         public Dictionary<string, int> stats { get; set; }
     }
 
+    public class ItemSlotDTO
+    {
+        public string name { get; set; }
+        public string ItemType { get; set; }
+        public Dictionary<string, int> stats { get; set; }
+    }
     public class ItemStatsDTO
     {
         public int? Health { get; set; }

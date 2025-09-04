@@ -35,7 +35,7 @@ namespace DungeonCrawlerAPI.DTO_s
     public class EquipmentSlotDTO
     {
         public string SlotType { get; set; }
-        public ItemDTO Item { get; set; }
+        public ItemSlotDTO Item { get; set; }
     }
 
     public class CharacterStatsDTO
