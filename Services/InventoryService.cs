@@ -10,13 +10,12 @@ namespace DungeonCrawlerAPI.Services
         Task<ServiceResult<MInventory>> CreateNewInventoryAsync(string CharId);
         Task<ServiceResult<InventoryDTO>> GetInventoryById(string CharId);
         Task<ServiceResult<bool>> EquipItem(string characterId, string ItemId, EquipmentSlotType slotType);
-        Task<ServiceResult<bool>> UnEquipItem(string UserId, string Slot);
+        Task<ServiceResult<bool>> UnEquipItem(string characterId, EquipmentSlotType SlotType);
 
         
     }
     public class InventoryService : IInventoryService
     {
-        private readonly ICharacterRepository _characterRepository;
         private readonly IInventoryRepository _inventoryRepository;
         private readonly IItemsRepository _itemsRepository;
         private readonly IEquipmentSlotRepository _equipmentSlotRepository;
@@ -24,7 +23,6 @@ namespace DungeonCrawlerAPI.Services
         {
             _inventoryRepository = inventoryRepository;
             _itemsRepository = itemsRepository;
-            _characterRepository = characterRepository;
             _equipmentSlotRepository = equipmentSlotRepository;
         }
 
@@ -67,12 +65,17 @@ namespace DungeonCrawlerAPI.Services
 
             if (!string.IsNullOrEmpty(Slot.ItemId))
             {
-                // Futuro: Implementar el intercambio de ítems.
-                return ServiceResult<bool>.Error("El slot ya está ocupado.");
+                var OldItemId = Slot.ItemId;
+                var OldItem = await _itemsRepository.GetByIdAsync(OldItemId);
+                if(OldItem != null)
+                {
+                    OldItem.InventaryId = inventory?.Id;
+                    await _itemsRepository.UpdateAsync(OldItem);
+                }
             }
 
-            //itemToEquip.InventaryId = null; // O la forma que uses para desvincularlo
-
+            itemToEquip.InventaryId = null;
+            await _itemsRepository.UpdateAsync(itemToEquip);
 
             // Actualizar el slot si ya existe pero está vacío
             Slot.ItemId = itemId;
@@ -109,9 +112,33 @@ namespace DungeonCrawlerAPI.Services
             return ServiceResult<InventoryDTO>.Success(response);
         }
 
-        public Task<ServiceResult<bool>> UnEquipItem(string UserId, string Slot)
+        public async Task<ServiceResult<bool>> UnEquipItem(string characterId, EquipmentSlotType SlotType)
         {
-            throw new NotImplementedException();
+            var inventory = await _inventoryRepository.GetInventoryByCharId(characterId);
+            if(inventory == null)
+            {
+                return ServiceResult<bool>.NotFound("El inventario no fue encontrado.");
+            }
+
+            var slot = await _equipmentSlotRepository.GetSlotByCharacterAndTypeAsync(characterId, SlotType);
+            if(slot == null || string.IsNullOrEmpty(slot.ItemId))
+            {
+                return ServiceResult<bool>.NotFound("No hay item equipado en ese slot");
+            }
+
+            var itemToUnequip = await _itemsRepository.GetByIdAsync(slot.ItemId);
+            if(itemToUnequip == null)
+            {
+                return ServiceResult<bool>.NotFound("El item a desequipar no fue encontrado");
+            }
+
+            itemToUnequip.InventaryId = inventory.Id;
+            await _itemsRepository.UpdateAsync(itemToUnequip);
+
+            slot.ItemId = null;
+            await _equipmentSlotRepository.UpdateAsync(slot);
+
+            return ServiceResult<bool>.Success(true);
         }
 
         private List<MItems> CreateInitialInventory(string InventoryId)
