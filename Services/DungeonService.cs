@@ -12,6 +12,13 @@ namespace DungeonCrawlerAPI.Services
         Task<ServiceResult<bool>> DeleteDungeon(string DungeonId);
     }
 
+    public interface IDungeonRunService
+    {
+        Task<ServiceResult<DungeonRunDTO>> StartDungeonRunAsync(string characterId, string dungeonId);
+        Task<ServiceResult<DungeonRunDTO>> CompleteDungeonRunAsync(string runId, CompleteDungeonRunDTO completeDungeon);
+        Task<ServiceResult<List<DungeonRunDTO>>> GetDungeonRunByCharacterAsync(string characterId);
+    }
+
     public class DungeonService : IDungeonService
     {
 
@@ -89,6 +96,103 @@ namespace DungeonCrawlerAPI.Services
             };
 
             return ServiceResult<DungeonDTO>.Success(response);
+        }
+    }
+
+    public class DungeonRunService : IDungeonRunService
+    {
+
+        private readonly IDungeonRepository _dungeonRepository;
+        private readonly IDungeonRunRepository _dungeonRunRepository;
+        private readonly ICharacterRepository _characterRepository;
+
+        public DungeonRunService(IDungeonRepository dungeonRepository, IDungeonRunRepository dungeonRunRepository ,ICharacterRepository characterRepository)
+        {
+            _characterRepository = characterRepository;
+            _dungeonRepository = dungeonRepository;
+            _dungeonRunRepository = dungeonRunRepository;
+        }
+
+        public async Task<ServiceResult<DungeonRunDTO>> CompleteDungeonRunAsync(string runId, CompleteDungeonRunDTO completeDungeon)
+        {
+            var Rundb = await _dungeonRunRepository.GetbyIdWithDungeon(runId);
+
+            if (Rundb == null)
+            {
+                return ServiceResult<DungeonRunDTO>.NotFound("No encontrado ningun intento con esa ID");
+            }
+
+            Rundb.IsSuccess = completeDungeon.IsSuccess;
+            Rundb.CompletionTime = completeDungeon.CompletionTime;
+
+            await _dungeonRunRepository.UpdateAsync(Rundb);
+
+            var response = new DungeonRunDTO
+            {
+                id = runId,
+                DungeonName = Rundb.Dungeon.Name,
+                IsSuccess = Rundb.IsSuccess,
+                CompletionTime = Rundb.CompletionTime,
+                CreatedAt = Rundb.CreatedAt,
+            };
+
+            return ServiceResult<DungeonRunDTO>.Success(response);
+        }
+
+        public async Task<ServiceResult<List<DungeonRunDTO>>> GetDungeonRunByCharacterAsync(string characterId)
+        {
+            var characterDb = await _characterRepository.GetByIdAsync(characterId);
+            if(characterDb == null)
+            {
+                return ServiceResult<List<DungeonRunDTO>>.NotFound("El personaje no fue encontrado");
+            }
+
+            var runs = await _dungeonRunRepository.GetRunsByCharacterId(characterId);
+
+            var response = runs.Select(run => new DungeonRunDTO
+            {
+                id = run.Id,
+                DungeonName = run.Dungeon.Name,
+                IsSuccess = run.IsSuccess,
+                CompletionTime = run.CompletionTime,
+                CreatedAt = run.CreatedAt,
+            }).ToList();
+
+            return ServiceResult<List<DungeonRunDTO>>.Success(response);
+        }
+
+        public async Task<ServiceResult<DungeonRunDTO>> StartDungeonRunAsync(string characterId, string dungeonId)
+        {
+            var charDb = await _characterRepository.GetByIdAsync(characterId);
+            if(charDb == null)
+            {
+                return ServiceResult<DungeonRunDTO>.NotFound("El personaje no fue encontrado");
+            }
+
+            var dungeonDb = await _dungeonRepository.GetByIdAsync(dungeonId);
+            if(dungeonDb == null)
+            {
+                return ServiceResult<DungeonRunDTO>.NotFound("La mazmorra no fue encontrado");
+            }
+
+
+            var createRun = await _dungeonRunRepository.CreateAsync(new MDungeonRun
+            {
+                CompletionTime = 0,
+                CharacterId = characterId,
+                DungeonId = dungeonId,
+            });
+
+            var response = new DungeonRunDTO
+            {
+                id = createRun.Id,
+                DungeonName = dungeonDb.Name,
+                CompletionTime = createRun.CompletionTime,
+                IsSuccess = createRun.IsSuccess,
+                CreatedAt = createRun.CreatedAt,
+            };
+
+            return ServiceResult<DungeonRunDTO>.Success(response);
         }
     }
 }

@@ -17,7 +17,8 @@ namespace DungeonCrawlerAPI.Interfaces
 
     public interface IDungeonRunRepository: IRepository<MDungeonRun>
     {
-        Task<IEnumerable<MDungeonRun>> GetRunsByCharacterId(string characterId); 
+        Task<IEnumerable<MDungeonRun>> GetRunsByCharacterId(string characterId);
+        Task<MDungeonRun?> GetbyIdWithDungeon(string runId);
     }
 
     public class DungeonRunRepository : Repository<MDungeonRun>, IDungeonRunRepository
@@ -26,9 +27,14 @@ namespace DungeonCrawlerAPI.Interfaces
         {
         }
 
+        public async Task<MDungeonRun?> GetbyIdWithDungeon(string runId)
+        {
+            return await _dbset.Include(dr => dr.Dungeon).FirstOrDefaultAsync(dr => dr.Id == runId);
+        }
+
         public async Task<IEnumerable<MDungeonRun>> GetRunsByCharacterId(string characterId)
         {
-            return await _dbset.Where(dr => dr.CharacterId == characterId).ToListAsync();
+            return await _dbset.Include(dr => dr.Dungeon).Where(dr => dr.CharacterId == characterId).ToListAsync();
         }
     }
 }
