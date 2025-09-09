@@ -122,7 +122,7 @@ namespace DungeonCrawlerAPI.Services
                 return ServiceResult<DungeonRunDTO>.NotFound("No encontrado ningun intento con esa ID");
             }
 
-            if(Rundb.CharacterId == charID)
+            if(Rundb.CharacterId != charID)
             {
                 return ServiceResult<DungeonRunDTO>.NotFound("Esta run no pertenece a este personaje");
             }
