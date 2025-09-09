@@ -23,7 +23,11 @@ builder.Services.AddScoped<ICharacterService, CharacterService>();
 builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IItemsRepository, ItemsRepository>();
-
+builder.Services.AddScoped<IEquipmentSlotRepository, EquipmentSlotRepository>();
+builder.Services.AddScoped<IDungeonRepository, DungeonRepository>();
+builder.Services.AddScoped<IDungeonRunRepository, DungeonRunRepository>();
+builder.Services.AddScoped<IDungeonService, DungeonService>();
+builder.Services.AddScoped<IDungeonRunService, DungeonRunService>();
 
 
 builder.Services.AddDbContext<AppDBContext>(op =>

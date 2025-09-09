@@ -15,7 +15,7 @@ namespace DungeonCrawlerAPI.Services
     public interface IDungeonRunService
     {
         Task<ServiceResult<DungeonRunDTO>> StartDungeonRunAsync(string characterId, string dungeonId);
-        Task<ServiceResult<DungeonRunDTO>> CompleteDungeonRunAsync(string runId, CompleteDungeonRunDTO completeDungeon);
+        Task<ServiceResult<DungeonRunDTO>> CompleteDungeonRunAsync(string charId, string runId, CompleteDungeonRunDTO completeDungeon);
         Task<ServiceResult<List<DungeonRunDTO>>> GetDungeonRunByCharacterAsync(string characterId);
     }
 
@@ -113,13 +113,18 @@ namespace DungeonCrawlerAPI.Services
             _dungeonRunRepository = dungeonRunRepository;
         }
 
-        public async Task<ServiceResult<DungeonRunDTO>> CompleteDungeonRunAsync(string runId, CompleteDungeonRunDTO completeDungeon)
+        public async Task<ServiceResult<DungeonRunDTO>> CompleteDungeonRunAsync(string charID, string runId, CompleteDungeonRunDTO completeDungeon)
         {
             var Rundb = await _dungeonRunRepository.GetbyIdWithDungeon(runId);
 
             if (Rundb == null)
             {
                 return ServiceResult<DungeonRunDTO>.NotFound("No encontrado ningun intento con esa ID");
+            }
+
+            if(Rundb.CharacterId == charID)
+            {
+                return ServiceResult<DungeonRunDTO>.NotFound("Esta run no pertenece a este personaje");
             }
 
             Rundb.IsSuccess = completeDungeon.IsSuccess;
