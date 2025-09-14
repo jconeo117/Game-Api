@@ -16,6 +16,8 @@ namespace DungeonCrawlerAPI
         public DbSet<MDungeon> Dungeons { get; set; }
         public DbSet<MDungeonRun> DungeonRuns { get; set; }
         public DbSet<MEquipmentSlot> EquipmentSlots { get; set; }
+        public DbSet<MAuction> Auctions { get; set; }
+        public DbSet<MBid> Bids { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -90,6 +92,27 @@ namespace DungeonCrawlerAPI
                 Entity.HasIndex(es => new { es.CharacterId, es.SlotType }).IsUnique();
             });
 
+            modelBuilder.Entity<MAuction>(entity =>
+            {
+                entity.HasOne(a => a.mItem)
+                      .WithMany()
+                      .HasForeignKey(a => a.ItemId);
+
+                entity.HasOne(a => a.character)
+                      .WithMany()
+                      .HasForeignKey(a => a.SellerCharacterId);
+            });
+
+            modelBuilder.Entity<MBid>(entity =>
+            {
+                entity.HasOne(b => b.auction)
+                      .WithMany(a => a.Bids)
+                      .HasForeignKey(b => b.AuctionId);
+
+                entity.HasOne(b => b.character)
+                      .WithMany()
+                      .HasForeignKey(b => b.BidderCharacter);
+            });
             base.OnModelCreating(modelBuilder);
         }
 
