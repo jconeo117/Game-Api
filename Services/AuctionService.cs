@@ -11,6 +11,7 @@ namespace DungeonCrawlerAPI.Services
         Task<ServiceResult<AuctionDTO>> CreateAuctionAsync(string characterId, CreateAuctionDTO auctionDto);
         Task<ServiceResult<List<AuctionDTO>>> GetActiveAuctionsAsync();
         Task<ServiceResult<BidDTO>> PlaceBidAsync(string auctionId, string characterId, CreateBidDTO bidDto);
+        Task ProcessExpiredAuctionsAsync();
     }
 
     public class AuctionService : IAuctionService
@@ -20,19 +21,26 @@ namespace DungeonCrawlerAPI.Services
         private readonly ICharacterRepository _characterRepository;
         private readonly IItemsRepository _itemsRepository;
         private readonly IHubContext<AuctionHub> _hubContext;
+        private readonly IInventoryRepository _inventoryRepository;
+        private readonly ILogger<AuctionService> _logger;
 
         public AuctionService(
             IAuctionRepository auctionRepository,
             IBidRepository bidRepository,
             ICharacterRepository characterRepository,
             IItemsRepository itemsRepository,
-            IHubContext<AuctionHub> hubContext)
+            IHubContext<AuctionHub> hubContext,
+            IInventoryRepository inventoryRepository,
+            ILogger<AuctionService> logger
+            )
         {
             _auctionRepository = auctionRepository;
             _bidRepository = bidRepository;
             _characterRepository = characterRepository;
             _itemsRepository = itemsRepository;
             _hubContext = hubContext;
+            _inventoryRepository = inventoryRepository;
+            _logger = logger;
         }
 
         public async Task<ServiceResult<AuctionDTO>> CreateAuctionAsync(string characterId, CreateAuctionDTO auctionDto)
@@ -103,6 +111,55 @@ namespace DungeonCrawlerAPI.Services
 
             var bidDtoResult = new BidDTO { /* Mapear datos */ };
             return ServiceResult<BidDTO>.Success(bidDtoResult);
+        }
+
+        public async Task ProcessExpiredAuctionsAsync()
+        {
+            // 1. Encontrar todas las subastas activas cuya fecha de fin ya pasó
+            var expiredAuctions = await _auctionRepository.GetAllAsync(
+                a => a.AuctionStatus == AuctionStatus.Active && a.EndTime <= DateTime.UtcNow
+            );
+
+            foreach (var auction in expiredAuctions)
+            {
+                var bids = await _bidRepository.GetAllAsync(b => b.AuctionId == auction.Id);
+                var winningBid = bids.OrderByDescending(b => b.Amount).FirstOrDefault();
+
+                if (winningBid != null)
+                {
+                    // -- Subasta VENDIDA --
+                    auction.AuctionStatus = AuctionStatus.Sold;
+                    var winner = await _characterRepository.GetByIdAsync(winningBid.BidderCharacter);
+                    var seller = await _characterRepository.GetByIdAsync(auction.SellerCharacterId);
+                    var item = await _itemsRepository.GetByIdAsync(auction.ItemId);
+                    var winnerInventory = await _inventoryRepository.GetInventoryByCharId(winner.Id);
+
+                    // Transferir ítem al ganador
+                    item.InventaryId = winnerInventory.Id;
+                    await _itemsRepository.UpdateAsync(item);
+
+                    // Transferir oro al vendedor (considera una comisión)
+                    seller.Gold += (int)winningBid.Amount;
+                    await _characterRepository.UpdateAsync(seller);
+
+                    _logger.LogInformation($"Subasta {auction.Id} vendida a {winner.Name} por {winningBid.Amount}.");
+                }
+                else
+                {
+                    // -- Subasta EXPIRADA (sin pujas) --
+                    auction.AuctionStatus = AuctionStatus.Expired;
+                    var sellerInventory = await _inventoryRepository.GetInventoryByCharId(auction.SellerCharacterId);
+                    var item = await _itemsRepository.GetByIdAsync(auction.ItemId);
+
+                    // Devolver el ítem al vendedor
+                    item.InventaryId = sellerInventory.Id;
+                    await _itemsRepository.UpdateAsync(item);
+
+                    _logger.LogInformation($"Subasta {auction.Id} expiró sin pujas.");
+                }
+
+                await _auctionRepository.UpdateAsync(auction);
+            }
         }
     }
 }

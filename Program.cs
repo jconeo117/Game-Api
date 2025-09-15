@@ -42,6 +42,9 @@ builder.Services.AddScoped<IAuctionRepository, AuctionRepository>();
 builder.Services.AddScoped<IBidRepository, BidRepository>();
 builder.Services.AddScoped<IAuctionService, AuctionService>();
 
+
+builder.Services.AddHostedService<AuctionCleanService>();
+
 builder.Services.AddSignalR(); // <-- Añade SignalR
 
 builder.Services.AddDbContext<AppDBContext>(op =>
