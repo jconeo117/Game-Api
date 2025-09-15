@@ -1,5 +1,6 @@
 ﻿using DungeonCrawlerAPI.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 
 namespace DungeonCrawlerAPI.Interfaces
 {
@@ -7,6 +8,7 @@ namespace DungeonCrawlerAPI.Interfaces
     public interface IRepository<T> where T : BaseEntity
     {
         Task<IEnumerable<T>> GetAllAsync();
+        Task<IEnumerable<T>> GetAllAsync(Expression<Func<T, bool>> filter);
         Task<T?> GetByIdAsync(string id);
         Task<T> CreateAsync(T entity);
         Task<T> UpdateAsync(T entity);
@@ -60,7 +62,10 @@ namespace DungeonCrawlerAPI.Interfaces
         {
             return await _dbset.ToListAsync();
         }
-
+        public async Task<IEnumerable<T>> GetAllAsync(Expression<Func<T, bool>> filter)
+        {
+            return await _dbset.Where(filter).ToListAsync();
+        }
         public async Task<T?> GetByIdAsync(string id)
         {
             return await _dbset.FindAsync(id);
