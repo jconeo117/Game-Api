@@ -15,11 +15,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
-        builder =>
+        policyBuilder => // Renombré 'builder' a 'policyBuilder' para evitar confusión
         {
-            builder.AllowAnyOrigin()
-                   .AllowAnyMethod()
-                   .AllowAnyHeader();
+            // En lugar de AllowAnyOrigin(), usamos esto para ser más flexibles en desarrollo
+            // y añadimos AllowCredentials() que es la clave para que SignalR funcione.
+            policyBuilder.SetIsOriginAllowed(_ => true)
+                         .AllowAnyMethod()
+                         .AllowAnyHeader()
+                         .AllowCredentials(); // <-- ESTA LÍNEA ES LA MAGIA
         });
 });
 builder.Services.AddControllers();

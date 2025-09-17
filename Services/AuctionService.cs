@@ -71,7 +71,19 @@ namespace DungeonCrawlerAPI.Services
             // Notificar a los clientes a través de SignalR
             await _hubContext.Clients.All.SendAsync("NewAuction", createdAuction);
 
-            var auctionDtoResult = new AuctionDTO { /* Mapear datos */ };
+            var auctionDtoResult = new AuctionDTO {
+                Id = createdAuction.Id,
+                ItemId = item.Id,
+                ItemName = item.Name,
+                SellerCharacterId = characterId,
+                SellerCharacterName = seller.Name,
+                StartingPrice = createdAuction.StartingPrice,
+                BuyoutPrice= createdAuction.BuyoutPrice,
+                CurrentPrice = createdAuction.StartingPrice,
+                EndTime = createdAuction.EndTime,
+                Status = createdAuction.AuctionStatus.ToString(),
+
+            };
             return ServiceResult<AuctionDTO>.Success(auctionDtoResult);
         }
 
@@ -93,7 +105,52 @@ namespace DungeonCrawlerAPI.Services
                 return ServiceResult<BidDTO>.Error("La subasta no está activa.");
             }
 
-            // Aquí deberías incluir la lógica de validación de la puja (ej. que sea mayor al precio actual)
+            if (bidder == null)
+            {
+                return ServiceResult<BidDTO>.Error("El personaje no existe.");
+            }
+
+            // Validar que el bidder no sea el propietario del item
+            if (auction.CreatedBy == characterId)
+            {
+                return ServiceResult<BidDTO>.Error("No puedes pujar en tu propia subasta.");
+            }
+
+            var highestBid = await _bidRepository.GetHighestBidForAuctionAsync(auctionId);
+            var currentHighestAmount = highestBid?.Amount ?? auction.StartingPrice;
+
+            // Validar que la nueva puja sea mayor al precio actual
+            if (bidDto.Amount <= currentHighestAmount)
+            {
+                return ServiceResult<BidDTO>.Error($"La puja debe ser mayor a {currentHighestAmount:C}");
+            }
+
+            if (bidder.Gold < bidDto.Amount)
+            {
+                return ServiceResult<BidDTO>.Error("No tienes suficiente dinero para realizar esta puja.");
+            }
+
+            // Si hay una puja anterior del mismo usuario, devolver el dinero
+            var previousBidByUser = await _bidRepository.GetLatestBidByUserAsync(auctionId, characterId);
+            if (previousBidByUser != null)
+            {
+                bidder.Gold += (int)previousBidByUser.Amount; // Devolver dinero de la puja anterior
+            }
+
+            // Descontar el dinero de la nueva puja
+            bidder.Gold -= (int)bidDto.Amount;
+
+            // Si había otra puja más alta, devolver dinero al anterior bidder más alto
+            if (highestBid != null && highestBid.BidderCharacter != characterId)
+            {
+                var previousHighestBidder = await _characterRepository.GetByIdAsync(highestBid.BidderCharacter);
+                if (previousHighestBidder != null)
+                {
+                    previousHighestBidder.Gold += (int)highestBid.Amount;
+                    await _characterRepository.UpdateAsync(previousHighestBidder);
+                }
+            }
+
 
             var newBid = new MBid
             {
@@ -107,9 +164,19 @@ namespace DungeonCrawlerAPI.Services
             await _bidRepository.CreateAsync(newBid);
 
             // Notificar a los clientes sobre la nueva puja
-            await _hubContext.Clients.Group(auctionId).SendAsync("NewBid", new { auctionId, bid = newBid });
+            await _hubContext.Clients.Group(auctionId).SendAsync("NewBid", new
+            {
+                auctionId = auctionId,
+                bidderName = bidder.Name,
+                amount = newBid.Amount,
+                bidTime = newBid.BidTime
+            });
 
-            var bidDtoResult = new BidDTO { /* Mapear datos */ };
+            var bidDtoResult = new BidDTO {
+                BidderCharacterName = bidder.Name,
+                Amount = newBid.Amount,
+                BidTime = newBid.BidTime,
+            };
             return ServiceResult<BidDTO>.Success(bidDtoResult);
         }
 
@@ -143,6 +210,13 @@ namespace DungeonCrawlerAPI.Services
                     await _characterRepository.UpdateAsync(seller);
 
                     _logger.LogInformation($"Subasta {auction.Id} vendida a {winner.Name} por {winningBid.Amount}.");
+                    await _hubContext.Clients.Group(auction.Id).SendAsync("AuctionEnded", new
+                    {
+                        auctionId = auction.Id,
+                        status = "Vendido",
+                        winnerName = winner.Name,
+                        finalPrice = winningBid.Amount
+                    });
                 }
                 else
                 {
@@ -156,6 +230,13 @@ namespace DungeonCrawlerAPI.Services
                     await _itemsRepository.UpdateAsync(item);
 
                     _logger.LogInformation($"Subasta {auction.Id} expiró sin pujas.");
+                    await _hubContext.Clients.Group(auction.Id).SendAsync("AuctionEnded", new
+                    {
+                        auctionId = auction.Id,
+                        status = "Expirado",
+                        winnerName = (string)null,
+                        finalPrice = 0
+                    });
                 }
 
                 await _auctionRepository.UpdateAsync(auction);
