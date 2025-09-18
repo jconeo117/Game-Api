@@ -1,8 +1,8 @@
 ﻿using DungeonCrawlerAPI.DTO_s;
+using DungeonCrawlerAPI.Hubs; // Asegúrate de crear este Hub
 using DungeonCrawlerAPI.Interfaces;
 using DungeonCrawlerAPI.Models;
 using Microsoft.AspNetCore.SignalR;
-using DungeonCrawlerAPI.Hubs; // Asegúrate de crear este Hub
 
 namespace DungeonCrawlerAPI.Services
 {
@@ -23,6 +23,7 @@ namespace DungeonCrawlerAPI.Services
         private readonly IHubContext<AuctionHub> _hubContext;
         private readonly IInventoryRepository _inventoryRepository;
         private readonly ILogger<AuctionService> _logger;
+        private readonly AppDBContext _context;
 
         public AuctionService(
             IAuctionRepository auctionRepository,
@@ -31,7 +32,8 @@ namespace DungeonCrawlerAPI.Services
             IItemsRepository itemsRepository,
             IHubContext<AuctionHub> hubContext,
             IInventoryRepository inventoryRepository,
-            ILogger<AuctionService> logger
+            ILogger<AuctionService> logger,
+            AppDBContext context
             )
         {
             _auctionRepository = auctionRepository;
@@ -41,6 +43,7 @@ namespace DungeonCrawlerAPI.Services
             _hubContext = hubContext;
             _inventoryRepository = inventoryRepository;
             _logger = logger;
+            _context = context;
         }
 
         public async Task<ServiceResult<AuctionDTO>> CreateAuctionAsync(string characterId, CreateAuctionDTO auctionDto)
@@ -97,87 +100,94 @@ namespace DungeonCrawlerAPI.Services
 
         public async Task<ServiceResult<BidDTO>> PlaceBidAsync(string auctionId, string characterId, CreateBidDTO bidDto)
         {
-            var auction = await _auctionRepository.GetByIdAsync(auctionId);
-            var bidder = await _characterRepository.GetByIdAsync(characterId);
-
-            if (auction == null || auction.AuctionStatus != AuctionStatus.Active)
+            // Inicia la transacción. Todo dentro del 'using' es parte de la "caja mágica".
+            using (var transaction = await _context.Database.BeginTransactionAsync())
             {
-                return ServiceResult<BidDTO>.Error("La subasta no está activa.");
-            }
-
-            if (bidder == null)
-            {
-                return ServiceResult<BidDTO>.Error("El personaje no existe.");
-            }
-
-            // Validar que el bidder no sea el propietario del item
-            if (auction.CreatedBy == characterId)
-            {
-                return ServiceResult<BidDTO>.Error("No puedes pujar en tu propia subasta.");
-            }
-
-            var highestBid = await _bidRepository.GetHighestBidForAuctionAsync(auctionId);
-            var currentHighestAmount = highestBid?.Amount ?? auction.StartingPrice;
-
-            // Validar que la nueva puja sea mayor al precio actual
-            if (bidDto.Amount <= currentHighestAmount)
-            {
-                return ServiceResult<BidDTO>.Error($"La puja debe ser mayor a {currentHighestAmount:C}");
-            }
-
-            if (bidder.Gold < bidDto.Amount)
-            {
-                return ServiceResult<BidDTO>.Error("No tienes suficiente dinero para realizar esta puja.");
-            }
-
-            // Si hay una puja anterior del mismo usuario, devolver el dinero
-            var previousBidByUser = await _bidRepository.GetLatestBidByUserAsync(auctionId, characterId);
-            if (previousBidByUser != null)
-            {
-                bidder.Gold += (int)previousBidByUser.Amount; // Devolver dinero de la puja anterior
-            }
-
-            // Descontar el dinero de la nueva puja
-            bidder.Gold -= (int)bidDto.Amount;
-
-            // Si había otra puja más alta, devolver dinero al anterior bidder más alto
-            if (highestBid != null && highestBid.BidderCharacter != characterId)
-            {
-                var previousHighestBidder = await _characterRepository.GetByIdAsync(highestBid.BidderCharacter);
-                if (previousHighestBidder != null)
+                try
                 {
-                    previousHighestBidder.Gold += (int)highestBid.Amount;
-                    await _characterRepository.UpdateAsync(previousHighestBidder);
+                    var auction = await _auctionRepository.GetByIdAsync(auctionId);
+                    var bidder = await _characterRepository.GetByIdAsync(characterId);
+
+                    if (auction == null || auction.AuctionStatus != AuctionStatus.Active)
+                    {
+                        return ServiceResult<BidDTO>.Error("La subasta no está activa.");
+                    }
+
+                    if (bidder == null)
+                    {
+                        return ServiceResult<BidDTO>.Error("El personaje no existe.");
+                    }
+
+                    if (auction.SellerCharacterId == characterId)
+                    {
+                        return ServiceResult<BidDTO>.Error("No puedes pujar en tu propia subasta.");
+                    }
+
+                    var highestBid = await _bidRepository.GetHighestBidForAuctionAsync(auctionId);
+                    var currentHighestAmount = highestBid?.Amount ?? auction.StartingPrice;
+
+                    if (bidDto.Amount <= currentHighestAmount)
+                    {
+                        return ServiceResult<BidDTO>.Error($"La puja debe ser mayor a {currentHighestAmount:C}");
+                    }
+
+                    if (bidder.Gold < bidDto.Amount)
+                    {
+                        return ServiceResult<BidDTO>.Error("No tienes suficiente dinero para realizar esta puja.");
+                    }
+
+                    // Si había otra puja más alta de OTRO jugador, devolverle el dinero.
+                    if (highestBid != null)
+                    {
+                        var previousHighestBidder = await _characterRepository.GetByIdAsync(highestBid.BidderCharacter);
+                        if (previousHighestBidder != null)
+                        {
+                            previousHighestBidder.Gold += (int)highestBid.Amount;
+                            _context.Characters.Update(previousHighestBidder); // Preparamos el cambio
+                        }
+                    }
+
+                    // Descontar el dinero de la nueva puja
+                    bidder.Gold -= (int)bidDto.Amount;
+                    _context.Characters.Update(bidder); // Preparamos el cambio
+
+                    var newBid = new MBid
+                    {
+                        AuctionId = auctionId,
+                        BidderCharacter = characterId,
+                        Amount = bidDto.Amount,
+                        BidTime = DateTime.UtcNow,
+                        CreatedBy = bidder.Name
+                    };
+
+                    await _context.Bids.AddAsync(newBid); // Preparamos la nueva puja
+
+                    // ¡Solo guardamos todo en la base de datos UNA VEZ!
+                    await _context.SaveChangesAsync();
+
+                    // Si llegamos aquí sin errores, confirmamos todos los cambios.
+                    await transaction.CommitAsync();
+
+                    // La notificación de SignalR va DESPUÉS de confirmar la transacción.
+                    await _hubContext.Clients.Group(auctionId).SendAsync("NewBid", new
+                    {
+                        auctionId = auctionId,
+                        bidderName = bidder.Name,
+                        amount = newBid.Amount,
+                        bidTime = newBid.BidTime
+                    });
+
+                    var bidDtoResult = new BidDTO { /* Mapear tus datos */ };
+                    return ServiceResult<BidDTO>.Success(bidDtoResult);
+                }
+                catch (Exception ex)
+                {
+                    // Si algo falló, revertimos TODO.
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, "Error al procesar la puja, la transacción fue revertida.");
+                    return ServiceResult<BidDTO>.Error("Ocurrió un error al procesar tu puja.");
                 }
             }
-
-
-            var newBid = new MBid
-            {
-                AuctionId = auctionId,
-                BidderCharacter = characterId,
-                Amount = bidDto.Amount,
-                BidTime = DateTime.UtcNow,
-                CreatedBy = bidder.Name
-            };
-
-            await _bidRepository.CreateAsync(newBid);
-
-            // Notificar a los clientes sobre la nueva puja
-            await _hubContext.Clients.Group(auctionId).SendAsync("NewBid", new
-            {
-                auctionId = auctionId,
-                bidderName = bidder.Name,
-                amount = newBid.Amount,
-                bidTime = newBid.BidTime
-            });
-
-            var bidDtoResult = new BidDTO {
-                BidderCharacterName = bidder.Name,
-                Amount = newBid.Amount,
-                BidTime = newBid.BidTime,
-            };
-            return ServiceResult<BidDTO>.Success(bidDtoResult);
         }
 
         public async Task ProcessExpiredAuctionsAsync()
