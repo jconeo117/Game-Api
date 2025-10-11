@@ -9,7 +9,7 @@ namespace DungeonCrawlerAPI.Services
     public interface IAuctionService
     {
         Task<ServiceResult<AuctionDTO>> CreateAuctionAsync(string characterId, CreateAuctionDTO auctionDto);
-        Task<ServiceResult<List<AuctionDTO>>> GetActiveAuctionsAsync();
+        Task<ServiceResult<List<AuctionDTO>>> GetActiveAuctionsAsync(string? itemName = null, decimal? minPrice = null, decimal? maxPrice = null, string? itemType = null);
         Task<ServiceResult<BidDTO>> PlaceBidAsync(string auctionId, string characterId, CreateBidDTO bidDto);
         Task ProcessExpiredAuctionsAsync();
     }
@@ -74,27 +74,100 @@ namespace DungeonCrawlerAPI.Services
             // Notificar a los clientes a través de SignalR
             await _hubContext.Clients.All.SendAsync("NewAuction", createdAuction);
 
-            var auctionDtoResult = new AuctionDTO {
+            var auctionDtoResult = new AuctionDTO
+            {
                 Id = createdAuction.Id,
                 ItemId = item.Id,
-                ItemName = item.Name,
+                Item = new ItemDTO
+                {
+                    Id = item.Id,
+                    Name = item.Name,
+                    Description = item.Description,
+                    ItemType = item.ItemType.ToString(),
+                    value = item.Value,
+                    stats = item.Stats.GetActiveStats()
+                },
                 SellerCharacterId = characterId,
                 SellerCharacterName = seller.Name,
                 StartingPrice = createdAuction.StartingPrice,
-                BuyoutPrice= createdAuction.BuyoutPrice,
+                BuyoutPrice = createdAuction.BuyoutPrice,
                 CurrentPrice = createdAuction.StartingPrice,
                 EndTime = createdAuction.EndTime,
                 Status = createdAuction.AuctionStatus.ToString(),
-
             };
             return ServiceResult<AuctionDTO>.Success(auctionDtoResult);
         }
 
-        public async Task<ServiceResult<List<AuctionDTO>>> GetActiveAuctionsAsync()
+        public async Task<ServiceResult<List<AuctionDTO>>> GetActiveAuctionsAsync(string? itemName = null,
+                                                                                decimal? minPrice = null,
+                                                                                decimal? maxPrice = null,
+                                                                                string? itemType = null)
         {
-            // Lógica para obtener subastas activas
-            var auctions = await _auctionRepository.GetAllAsync(); // Deberías filtrar por activas
-            var activeAuctionsDto = auctions.Select(a => new AuctionDTO { /* Mapear datos */ }).ToList();
+            // Obtener todas las subastas activas desde el repositorio
+            var auctions = await _auctionRepository.GetActiveAuctionsWithDetailsAsync();
+
+            // Aplicar filtros ANTES del mapeo a DTO
+            var filteredAuctions = auctions.AsEnumerable();
+
+            if (!string.IsNullOrEmpty(itemName))
+            {
+                filteredAuctions = filteredAuctions.Where(a =>
+                    a.mItem.Name.Contains(itemName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (minPrice.HasValue)
+            {
+                filteredAuctions = filteredAuctions.Where(a =>
+                {
+                    var currentPrice = a.Bids.Any() ? a.Bids.Max(b => b.Amount) : a.StartingPrice;
+                    return currentPrice >= minPrice.Value;
+                });
+            }
+
+            if (maxPrice.HasValue)
+            {
+                filteredAuctions = filteredAuctions.Where(a =>
+                {
+                    var currentPrice = a.Bids.Any() ? a.Bids.Max(b => b.Amount) : a.StartingPrice;
+                    return currentPrice <= maxPrice.Value;
+                });
+            }
+
+            if (!string.IsNullOrEmpty(itemType))
+            {
+                filteredAuctions = filteredAuctions.Where(a =>
+                    a.mItem.ItemType.ToString().Equals(itemType, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // AHORA SÍ mapear a DTO después de filtrar
+            var activeAuctionsDto = filteredAuctions.Select(a => new AuctionDTO
+            {
+                Id = a.Id,
+                ItemId = a.ItemId,
+                SellerCharacterId = a.SellerCharacterId,
+                SellerCharacterName = a.character.Name,
+                StartingPrice = a.StartingPrice,
+                BuyoutPrice = a.BuyoutPrice,
+                CurrentPrice = a.Bids.Any() ? a.Bids.Max(b => b.Amount) : a.StartingPrice,
+                EndTime = a.EndTime,
+                Status = a.AuctionStatus.ToString(),
+                Item = new ItemDTO
+                {
+                    Id = a.mItem.Id,
+                    Name = a.mItem.Name,
+                    Description = a.mItem.Description,
+                    ItemType = a.mItem.ItemType.ToString(),
+                    value = a.mItem.Value,
+                    stats = a.mItem.Stats.GetActiveStats()
+                },
+                Bids = a.Bids.OrderByDescending(b => b.BidTime).Select(b => new BidDTO
+                {
+                    BidderCharacterName = b.character.Name,
+                    Amount = b.Amount,
+                    BidTime = b.BidTime
+                }).ToList()
+            }).ToList();
+
             return ServiceResult<List<AuctionDTO>>.Success(activeAuctionsDto);
         }
 

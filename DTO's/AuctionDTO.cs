@@ -4,7 +4,7 @@
     {
         public string Id { get; set; }
         public string ItemId { get; set; }
-        public string ItemName { get; set; }
+        public ItemDTO Item { get; set; }
         public string SellerCharacterId { get; set; }
         public string SellerCharacterName { get; set; }
         public decimal StartingPrice { get; set; }
@@ -12,7 +12,7 @@
         public decimal CurrentPrice { get; set; }
         public DateTime EndTime { get; set; }
         public string Status { get; set; }
-        public List<BidDTO> Bids { get; set; }
+        public List<BidDTO> Bids { get; set; } = new();
     }
 
     public class CreateAuctionDTO
