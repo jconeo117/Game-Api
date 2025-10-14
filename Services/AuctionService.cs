@@ -48,14 +48,22 @@ namespace DungeonCrawlerAPI.Services
 
         public async Task<ServiceResult<AuctionDTO>> CreateAuctionAsync(string characterId, CreateAuctionDTO auctionDto)
         {
-            // Lógica para crear una subasta
             var seller = await _characterRepository.GetByIdAsync(characterId);
-            var item = await _itemsRepository.GetByIdAsync(auctionDto.ItemId);
+            if (seller == null) return ServiceResult<AuctionDTO>.NotFound("Vendedor no encontrado.");
 
-            if (item == null || item.InventaryId == null) // Asumimos que si está en una subasta no está en el inventario
+            var inventory = await _inventoryRepository.GetInventoryByCharId(characterId);
+            if (inventory == null) return ServiceResult<AuctionDTO>.Error("Inventario no encontrado.");
+
+            // El ítem debe existir Y pertenecer al inventario del vendedor
+            var item = await _itemsRepository.GetByIdAsync(auctionDto.ItemId);
+            if (item == null || item.InventaryId != inventory.Id)
             {
-                return ServiceResult<AuctionDTO>.Error("El ítem no es válido para subastar.");
+                return ServiceResult<AuctionDTO>.Error("El ítem no se encuentra en tu inventario.");
             }
+
+            // Quitar el ítem del inventario para ponerlo en "escrow"
+            item.InventaryId = null;
+            await _itemsRepository.UpdateAsync(item);
 
             var newAuction = new MAuction
             {
@@ -64,7 +72,7 @@ namespace DungeonCrawlerAPI.Services
                 StartingPrice = auctionDto.StartingPrice,
                 BuyoutPrice = auctionDto.BuyoutPrice,
                 StartTime = DateTime.UtcNow,
-                EndTime = DateTime.UtcNow.AddHours(auctionDto.DurationInHours),
+                EndTime = DateTime.UtcNow.AddMinutes(auctionDto.DurationInHours),
                 AuctionStatus = AuctionStatus.Active,
                 CreatedBy = seller.Name
             };
@@ -95,6 +103,7 @@ namespace DungeonCrawlerAPI.Services
                 EndTime = createdAuction.EndTime,
                 Status = createdAuction.AuctionStatus.ToString(),
             };
+
             return ServiceResult<AuctionDTO>.Success(auctionDtoResult);
         }
 
