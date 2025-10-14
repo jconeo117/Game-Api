@@ -1,4 +1,5 @@
 using DungeonCrawlerAPI;
+using DungeonCrawlerAPI.Data;
 using DungeonCrawlerAPI.Hubs;
 using DungeonCrawlerAPI.Interfaces;
 using DungeonCrawlerAPI.Services;
@@ -44,7 +45,7 @@ builder.Services.AddScoped<IDungeonRunService, DungeonRunService>();
 builder.Services.AddScoped<IAuctionRepository, AuctionRepository>();
 builder.Services.AddScoped<IBidRepository, BidRepository>();
 builder.Services.AddScoped<IAuctionService, AuctionService>();
-
+builder.Services.AddScoped<IShopService, ShopService>();
 
 builder.Services.AddHostedService<AuctionCleanService>();
 
@@ -104,6 +105,29 @@ builder.Services.AddSwaggerGen(c =>
 
 });
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<AppDBContext>();
+
+        // Aplicar migraciones pendientes
+        await context.Database.MigrateAsync();
+
+        // Ejecutar el seeder de la tienda
+        var shopSeeder = new ShopItemsSeeder(context);
+        await shopSeeder.SeedShopItemsAsync();
+
+        Console.WriteLine("Seeding de la tienda completado exitosamente.");
+    }
+    catch (Exception ex)
+    {
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Ocurrió un error durante el seeding de la tienda.");
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
