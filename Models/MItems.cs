@@ -22,10 +22,12 @@ namespace DungeonCrawlerAPI.Models
         [Column("Value")]
         public int Value { get; set; }
 
+        [Column("Is_System_Item")]
+        public bool IsSystemItem { get; set; } = false; // <-- NUEVA PROPIEDAD
+
         [Column(TypeName = "json")]
         public string StatsJson { get; set; }
 
-        // Propiedad no mapeada para trabajar con las stats
         [NotMapped]
         public ItemStats Stats
         {
@@ -35,7 +37,6 @@ namespace DungeonCrawlerAPI.Models
             set => StatsJson = JsonSerializer.Serialize(value);
         }
 
-        //Relaciones
         [Column("Inventario")]
         public string? InventaryId { get; set; }
 
